@@ -382,7 +382,7 @@ def verify(work: Path) -> list[str]:
     if unagreed:
         problems.append(f"unagreed crossings: {unagreed}")
     if len(agreed) < 6:
-        problems.append(f"only {len(agreed)} agreed crossings (A-F + 2 responses = 8)")
+        problems.append(f"only {len(agreed)} agreed crossings (A,B,D,E,F + 2 responses = 7)")
     sev = [e for e in read_jsonl(work / "sender_book.jsonl") if e.get("kind") == "event"]
     if not any(e.get("event") == "refusal_received" for e in sev):
         problems.append("sender never received the refusal profile")
