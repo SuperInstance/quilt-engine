@@ -21,14 +21,18 @@ build).
 - Tag: **PROPOSED** (mechanism settled as the choice; field mapping to the
   envelope tuple is this repo's design work).
 
-### ADAPT — Conformal quantiles + SGR binomial-bound calibration (arXiv:1705.08500, arXiv:2107.07511) → `seams/` band edges
-- **Replaces:** hand-set go/no-go thresholds for the Jev pair (SPEC rule
-  G2). Band edges become formula-shaped, set from a small calibration set,
-  with an auditable statistical story.
+### ADAPT — Conformal quantiles + SGR binomial-bound calibration (arXiv:1705.08500, arXiv:2107.07511) → `seams/` deadband band edges
+- **Replaces:** hand-set band edges for the receiver's **(band,
+  yaw-time)** deadband (SPEC rule G2). Band edges become formula-shaped,
+  set from a small calibration set, with an auditable statistical story.
+  Yaw-time remains a separate context-set, learnable duration parameter;
+  conformal calibration does not collapse the pair into one threshold.
 - **Two mandatory inversions:** (1) band the *receiver's* scores, not a
-  model's self-assessment; (2) an ambiguous middle triggers a narrower
-  question, not a bigger output set. Sender/receiver divergence is
-  non-exchangeability — log it (SPEC §3.4), never average it away.
+  model's self-assessment; (2) calibration informs the Act trigger, not
+  the Act response — clarify/narrow is one policy response after a
+  persistent excursion, not the meaning of the band. Sender/receiver
+  divergence is non-exchangeability — log it (SPEC §3.4), never average
+  it away.
 - **Does not touch the comparative rule:** calibration sets where the band
   edges sit; it never converts the pick into an absolute score.
   BUILD-BRIEF's comparative-pick acceptance test still governs.
@@ -38,8 +42,9 @@ build).
 ### ADAPT — Mozannar & Sontag comparative-defer loss + Switch Transformer divergence logging (arXiv:2006.01862, arXiv:2101.03961) → `seams/ReceiverJev` + disagreement record
 - **Replaces:** an ad-hoc receiver score and the unspecified
   divergence-logging step of the seam handshake. Cross-entropy over
-  classes ∪ {defer} is the credible starting formula for a pick that must
-  beat the competing pool *and* the option to defer; Switch's
+  classes ∪ {defer} is the credible starting formula for a comparative
+  pick and, once the deadband triggers Act, for the policy's response
+  choice; it does not define the deadband trigger itself. Switch's
   dispatched-fraction-vs-mean-probability term templates the
   divergence-from-uniform log (SPEC G3).
 - Tag: **PROPOSED** (formula source settled; our extension — N competing
@@ -82,26 +87,33 @@ build).
   calibration corpus, stitch-point granularity, and acceptance test.
   ARCHITECTURE's "ignore all latent-vector material" rule stands.
 
-## Open decisions — NOT settled by the foundations
+## Decisions — deadband ruled; state model still open elsewhere
 
-### Deadband semantics (Casey's ruling: clarify-only vs abstain as a fourth outcome)
-The foundations do **not** settle this, and this file does not either.
-Note the tension a builder will hit: ARCHITECTURE.md marks the clarify
-outcome "**Settled**" (SPEC §3.3) and, two bullets later, calls abstain
-"the one open decision in the design." Both statements are in force —
-build to the SPEC, keep the reserved value un-producible.
+### Deadband semantics — RULED by Casey, 2026-10-21 (autopilot doctrine)
+Casey rejected both earlier framings — clarify-only, and clarify plus
+abstain as a fourth outcome. The mechanism is a **(band, yaw-time)**
+pair around the receiver's predicted/expected course of action:
 
-Sections that change under each ruling:
-- **Clarify-only (SPEC as written):** `seams/Deadband` as documented; the
-  conformal calibration above has a binary band to place; the M&S loss's
-  {defer} class maps to the clarify/escalate act.
-- **Abstain added as a fourth outcome:** the decision type gains a
-  producible value (already reserved in ARCHITECTURE); `Deadband` needs a
-  rule distinguishing clarify-worthy from abstain-worthy middles;
-  calibration becomes a three-way band placement (accept / clarify /
-  abstain / refuse boundaries); the disagreement record and C2 log gain an
-  outcome category; BUILD-BRIEF acceptance tests need an abstain case.
-  None of that is designed until the ruling lands.
+- **Band:** maximum tolerated deviation for the current context. It is
+  narrow where the safety margin is narrow and wider where deviation
+  is cheap; in constrained contexts it stays inside the safety corridor.
+- **Yaw-time:** maximum duration an excursion outside the band may
+  persist before action. A return inside the band before it expires
+  resets the excursion.
+- **Decision type:** `Hold` (inside the band), `HoldWatch` (outside
+  the band, within yaw-time), and `Act(response)` (outside beyond
+  yaw-time). The response is chosen by policy — accept-best,
+  clarify/narrow, escalate, or refuse where no candidate is admissible.
+- **No `Abstain` value:** coasting is Hold behaviour inside the band.
+  Clarify is an Act response, not the definition of the deadband.
+- **Parameters:** band and yaw-time are context-set and learnable.
+  Conformal calibration sets band edges from receiver calibration
+  data; learning the settings and the outside-band response is the ML
+  problem.
+- **Acceptance tests:** a transient excursion outside the band that
+  returns inside within yaw-time produces `HoldWatch` then `Hold`,
+  never `Act`; an excursion persisting beyond yaw-time produces
+  `Act(response)`.
 
 ### State model
 Not this repo's question — `StateStore` already implements SPEC P4/P5
@@ -117,10 +129,11 @@ follow; until then, stored state is **SETTLED** here.
    Gap, not contradiction — the tuple predates the pull list. Resolve by
    designing the OTel-shaped provenance slot, not by inventing a local
    encoding.
-2. **"Settled" vs "open" on the deadband** (ARCHITECTURE.md, `seams/`):
-   the doc settles clarify and reserves abstain in adjacent bullets.
-   Read as: clarify is the v0 behaviour, the outcome set is not closed.
-   Flagged here so no builder cites the "Settled" tag as the ruling.
+2. **Deadband wording superseded by ruling** (ARCHITECTURE.md,
+   `seams/`): the earlier clarify/abstain framing has been replaced by
+   Casey's 2026-10-21 (band, yaw-time) mechanism and the
+   `Hold` / `HoldWatch` / `Act(response)` decision type. No reserved
+   abstain value remains.
 3. No occurrences of any refuted claim (sub-millisecond, rigid-graph,
    OPAL lineage, global optimality) exist in this repo — verified in the
    foundations pass; nothing to correct.
