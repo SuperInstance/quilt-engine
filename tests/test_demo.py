@@ -134,5 +134,61 @@ class TestExternalHalt(unittest.TestCase):
             self.assertIsNotNone(recv.poll())
 
 
+class TestPayloadScenario(unittest.TestCase):
+    """v0.2: the agreement protocol carrying an actual payload transfer.
+
+    The demo's own verifier checks the scenario end-to-end; these
+    assertions re-check the invariant against the two books directly:
+    settled only on both sides' agreement, open offers in both books
+    and neither derived state, the tampered payload disputed in both
+    books and never settled.
+    """
+
+    def test_payload_scenario_exhibits_settle_open_dispute(self):
+        with tempfile.TemporaryDirectory() as td:
+            env = dict(os.environ, DEMO_TIME_SCALE="0.6")
+            proc = subprocess.run(
+                [sys.executable, str(DEMO), "--dir", td, "--scenario", "payload"],
+                capture_output=True, text=True, timeout=180, env=env,
+            )
+            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+            self.assertIn("DEMO OK", proc.stdout)
+            self.assertIn("PAYLOAD OK", proc.stdout)
+
+            from quilt_engine.core import (
+                disputes,
+                open_offers,
+                settleable_crossings,
+                settled_payloads,
+            )
+
+            work = Path(td)
+            sbook = StateStore.load("vessel-a", work / "sender_book.jsonl")
+            rbook = StateStore.load("vessel-b", work / "receiver_book.jsonl")
+            # Settled: the route plan and the corrected manifest — the
+            # same two ids in both books, content folded from each ledger.
+            s_settled = settled_payloads(sbook.ledger)
+            r_settled = settled_payloads(rbook.ledger)
+            self.assertEqual(len(s_settled), 2)
+            self.assertEqual(set(s_settled), set(r_settled))
+            # Open: the speculative chart snapshot and the tampered
+            # manifest, open in both books, in neither derived state.
+            s_open, r_open = open_offers(sbook.ledger), open_offers(rbook.ledger)
+            self.assertEqual(len(s_open), 2)
+            self.assertEqual(s_open, r_open)
+            self.assertTrue(set(s_open).isdisjoint(s_settled))
+            # Disputed: the tampered manifest, visible on both sides
+            # (receiver's RECEIVE-DISPUTED booking, sender's returned
+            # dispute crossing), blocked from settlement forever.
+            s_disp = [d for d in disputes(sbook.ledger) if d["seen_as"] == "dispute_response"]
+            r_disp = [d for d in disputes(rbook.ledger) if d["seen_as"] == "receive_disputed"]
+            self.assertEqual(len(s_disp), 1)
+            self.assertEqual(len(r_disp), 1)
+            self.assertEqual(s_disp[0]["transmission_id"], r_disp[0]["transmission_id"])
+            settleable, blocked = settleable_crossings(sbook.ledger, rbook.ledger)
+            self.assertIn(s_disp[0]["transmission_id"], blocked)
+            self.assertNotIn(s_disp[0]["transmission_id"], settleable)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -8,7 +8,12 @@ cost-budget}`` plus two additions the later programme documents require:
   FOUNDATIONS pull list (see this repo's FOUNDATIONS-APPLICATION.md);
 - a **payload hash**, so the sender's SEND booking and the receiver's
   RECEIVE booking of the same crossing can be checked against each
-  other (SPEC P5: only entries both sides agree on count as shared).
+  other (SPEC P5: only entries both sides agree on count as shared);
+- v0.2, payload kind: an optional **declared size** (bytes of the
+  carried content) and **governing contract identity**, so a payload
+  transmission can name the algorithm that governs its transfer — the
+  identity the ledger has stamped on bookings since v0 (gap 3), now
+  declared on the envelope itself.
 
 Rules enforced here, all from SPEC §2:
 
@@ -106,6 +111,10 @@ class TransmissionEnvelope:
     transmission_id: str = field(default_factory=lambda: _hex(8))
     provenance: Provenance = field(default_factory=Provenance)
     copy_authorized_by: str | None = None
+    # v0.2 payload kind: declared size of the carried content in bytes,
+    # and the identity of the contract governing the transfer.
+    payload_size: int | None = None
+    contract: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.type, str) or not self.type:
@@ -144,10 +153,12 @@ class TransmissionEnvelope:
             transmission_id=self.transmission_id,
             provenance=self.provenance.child(),
             copy_authorized_by=self.copy_authorized_by,
+            payload_size=self.payload_size,
+            contract=self.contract,
         )
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        d = {
             "transmission_id": self.transmission_id,
             "payload": self.payload,
             "payload_hash": self.hash,
@@ -158,12 +169,19 @@ class TransmissionEnvelope:
             "copy_authorized_by": self.copy_authorized_by,
             "provenance": self.provenance.to_dict(),
         }
+        if self.payload_size is not None:
+            d["payload_size"] = self.payload_size
+        if self.contract is not None:
+            d["contract"] = self.contract
+        return d
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict(), sort_keys=True)
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "TransmissionEnvelope":
+    def from_dict(
+        cls, d: dict[str, Any], *, verify_payload_hash: bool = True
+    ) -> "TransmissionEnvelope":
         if "ending" not in d or d["ending"] is None:
             raise ValueError("T2: envelope has no ending (zero endings)")
         if isinstance(d["ending"], (list, tuple)):
@@ -179,11 +197,17 @@ class TransmissionEnvelope:
             if d.get("provenance")
             else Provenance(),
             copy_authorized_by=d.get("copy_authorized_by"),
+            payload_size=d.get("payload_size"),
+            contract=d.get("contract"),
         )
-        if "payload_hash" in d and d["payload_hash"] != env.hash:
+        if (
+            verify_payload_hash
+            and "payload_hash" in d
+            and d["payload_hash"] != env.hash
+        ):
             raise ValueError("payload hash mismatch: envelope was altered in transit")
         return env
 
     @classmethod
-    def from_json(cls, s: str) -> "TransmissionEnvelope":
-        return cls.from_dict(json.loads(s))
+    def from_json(cls, s: str, *, verify_payload_hash: bool = True) -> "TransmissionEnvelope":
+        return cls.from_dict(json.loads(s), verify_payload_hash=verify_payload_hash)

@@ -166,7 +166,7 @@ class Reading:
 class LedgerEntry:
     """One side's booking of one crossing (SPEC P5)."""
 
-    side: str  # "SEND" or "RECEIVE"
+    side: str  # "SEND" / "RECEIVE"; v0.2 payload path adds "RECEIVE-DISPUTED" and "SETTLE"
     transmission_id: str
     peer: str
     payload_type: str

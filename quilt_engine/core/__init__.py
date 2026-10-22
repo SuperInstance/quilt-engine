@@ -1,9 +1,36 @@
 """core — TransmissionEnvelope, AlgorithmContract, StateStore.
 Implements beam-quilt SPEC §2 (Transmission) and §1 P4-P5 (sovereign state, own log).
+v0.2: core.payload — the payload-transfer agreement (gap 2, deepened).
 """
 
 from .contract import AlgorithmContract, ContractResult
 from .envelope import Ending, Provenance, TransmissionEnvelope
+from .payload import (
+    DISPUTE_TYPE,
+    PAYLOAD_TYPE,
+    RECEIPT_TYPE,
+    OfferReading,
+    book_dispute_receive,
+    book_dispute_send,
+    book_disputed_receive,
+    book_offer_receive,
+    book_offer_send,
+    book_receipt_receive,
+    book_receipt_send,
+    book_settle,
+    content_size,
+    decode_wire,
+    disputes,
+    make_dispute,
+    make_payload_offer,
+    make_receipt,
+    measured_size,
+    open_offers,
+    read_offer,
+    settleable_crossings,
+    settled_payloads,
+    wire_content,
+)
 from .state import (
     PROJECTION_HORIZON_FACTOR,
     LedgerEntry,
@@ -25,4 +52,28 @@ __all__ = [
     "StateStore",
     "agreed_crossings",
     "PROJECTION_HORIZON_FACTOR",
+    "DISPUTE_TYPE",
+    "PAYLOAD_TYPE",
+    "RECEIPT_TYPE",
+    "OfferReading",
+    "book_dispute_receive",
+    "book_dispute_send",
+    "book_disputed_receive",
+    "book_offer_receive",
+    "book_offer_send",
+    "book_receipt_receive",
+    "book_receipt_send",
+    "book_settle",
+    "content_size",
+    "decode_wire",
+    "disputes",
+    "make_dispute",
+    "make_payload_offer",
+    "make_receipt",
+    "measured_size",
+    "open_offers",
+    "read_offer",
+    "settleable_crossings",
+    "settled_payloads",
+    "wire_content",
 ]
