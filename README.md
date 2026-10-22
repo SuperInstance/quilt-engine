@@ -6,7 +6,7 @@ For builders of sovereign edge and fleet nodes — devices that must coordinate 
 
 ## Status
 
-**Scaffolding only.** This repo is the directory skeleton, the module map, and the version-zero build brief. No implementation yet. The scaffolding synthesizes two incompatible layouts proposed in the Gemini conversation rounds (see [ARCHITECTURE.md](ARCHITECTURE.md)) into one — that synthesis is a liaison decision, recorded here so a builder agent does not have to re-derive it.
+**v0 built (2026-10-21).** The BUILD-BRIEF deliverables are implemented and acceptance-tested: `TransmissionEnvelope` + the Jev pair with the (band, yaw-time) deadband in `quilt_engine/`, one example `PatchManifest`, and the two-process file-drop demo in `examples/two_process_demo.py` (28 tests, `python3 -m unittest discover -s tests`, stdlib only). The scaffolding synthesizes two incompatible layouts proposed in the Gemini conversation rounds (see [ARCHITECTURE.md](ARCHITECTURE.md)) into one — that synthesis is a liaison decision, recorded here so a builder agent does not have to re-derive it.
 
 ## Spec of record
 
