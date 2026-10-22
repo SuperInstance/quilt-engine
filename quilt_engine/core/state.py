@@ -4,8 +4,16 @@
   perspective, each reading *dated*. Readings age; staleness is explicit
   (``Reading.age`` / ``Reading.is_stale``) because acting on a reading
   must account for its date. This is gap 1 of beam-quilt FOUNDATIONS in
-  its smallest honest form: dated readings + explicit staleness. (The
-  predictive model that fills the fog is not built in v0.)
+  its smallest honest form: dated readings + explicit staleness.
+  v0.1 adds the smallest honest piece of the fog model: a reading of a
+  numeric cell carries a **vector** — a ``trend`` (rate of change per
+  second) derived from the two most recent readings of that cell — and
+  can *project* itself a short way into the future
+  (``Reading.projected_value``). Linear, local, short-horizon: a wake,
+  not a prophecy. The projection horizon is capped at a small multiple
+  of the spacing between the readings the trend came from, so a wild
+  slope from two noisy, close-together readings cannot project
+  confidently far (``Projection.refused`` says why, out loud).
 - **Active ledger** — transmissions booked as entries, not private
   notes. Every crossing is booked twice across the quilt: a SEND by the
   sender, a RECEIVE by the receiver, each entry carrying the identity of
@@ -28,14 +36,63 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
+# A projection may reach at most this many times the spacing between
+# the two readings its trend was derived from. Two readings 0.1 s apart
+# license a glance 0.3 s ahead, not a forecast a minute out.
+PROJECTION_HORIZON_FACTOR = 3.0
+
+
+@dataclass
+class Projection:
+    """One reading's linear extrapolation to a later time.
+
+    Explicit and inspectable: it carries the trend it used, the pair of
+    reading-times it was derived from (``based_on``), how far ahead it
+    reaches (``horizon``) and how far it was *allowed* to reach
+    (``max_horizon``). A refused projection has ``value is None`` and a
+    ``reason`` — refusal is a result, not a silent fallback.
+    """
+
+    value: float | None
+    trend: float
+    horizon: float  # seconds beyond the reading being projected
+    max_horizon: float  # PROJECTION_HORIZON_FACTOR x trend spacing
+    based_on: tuple[float, float]  # taken_at of the two readings used
+    refused: bool = False
+    reason: str = ""
+    used: bool = False  # set by a consumer that actually decided with it
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "value": self.value,
+            "trend": self.trend,
+            "horizon": self.horizon,
+            "max_horizon": self.max_horizon,
+            "based_on": list(self.based_on),
+            "refused": self.refused,
+            "reason": self.reason,
+            "used": self.used,
+        }
+
+
 @dataclass
 class Reading:
-    """One dated reading of one cell, from this patch's perspective."""
+    """One dated reading of one cell, from this patch's perspective.
+
+    v0.1: a numeric reading may also carry a *vector* — ``trend``, the
+    rate of change (per second) derived from this reading and the
+    previous reading of the same cell, with ``trend_from`` naming the
+    pair of reading-times it came from and ``trend_spacing`` their
+    distance apart. Non-numeric readings never carry a trend.
+    """
 
     cell: str
     value: Any
     taken_at: float  # seconds, on the reader's clock (time.monotonic in v0)
     note: str = ""
+    trend: float | None = None
+    trend_from: tuple[float, float] | None = None
+    trend_spacing: float | None = None
 
     def age(self, now: float) -> float:
         return now - self.taken_at
@@ -43,14 +100,66 @@ class Reading:
     def is_stale(self, now: float, max_age: float) -> bool:
         return self.age(now) > max_age
 
+    def project(
+        self, at_time: float, horizon_factor: float = PROJECTION_HORIZON_FACTOR
+    ) -> Projection:
+        """Extrapolate this reading's value to ``at_time``, linearly.
+
+        Refused (``Projection.refused``) when there is no trend, when
+        ``at_time`` precedes the reading, or when the horizon exceeds
+        ``horizon_factor`` x the spacing the trend was derived from.
+        """
+        based_on = self.trend_from or (self.taken_at, self.taken_at)
+        spacing = self.trend_spacing or 0.0
+        max_horizon = horizon_factor * spacing
+        horizon = at_time - self.taken_at
+        if self.trend is None:
+            return Projection(
+                value=None, trend=0.0, horizon=horizon,
+                max_horizon=max_horizon, based_on=based_on,
+                refused=True, reason="reading carries no trend",
+            )
+        if horizon < 0:
+            return Projection(
+                value=None, trend=self.trend, horizon=horizon,
+                max_horizon=max_horizon, based_on=based_on,
+                refused=True, reason="projection precedes the reading",
+            )
+        if horizon > max_horizon:
+            return Projection(
+                value=None, trend=self.trend, horizon=horizon,
+                max_horizon=max_horizon, based_on=based_on,
+                refused=True,
+                reason=(
+                    f"horizon {horizon:.3f}s exceeds cap {max_horizon:.3f}s "
+                    f"({horizon_factor}x the {spacing:.3f}s trend spacing)"
+                ),
+            )
+        return Projection(
+            value=float(self.value) + self.trend * horizon,
+            trend=self.trend, horizon=horizon, max_horizon=max_horizon,
+            based_on=based_on,
+        )
+
+    def projected_value(
+        self, at_time: float, horizon_factor: float = PROJECTION_HORIZON_FACTOR
+    ) -> float | None:
+        """value + trend x (at_time - taken_at), or None if refused."""
+        return self.project(at_time, horizon_factor).value
+
     def to_dict(self) -> dict[str, Any]:
-        return {
+        d: dict[str, Any] = {
             "kind": "reading",
             "cell": self.cell,
             "value": self.value,
             "taken_at": self.taken_at,
             "note": self.note,
         }
+        if self.trend is not None:
+            d["trend"] = self.trend
+            d["trend_from"] = list(self.trend_from) if self.trend_from else None
+            d["trend_spacing"] = self.trend_spacing
+        return d
 
 
 @dataclass
@@ -99,6 +208,10 @@ class LedgerEntry:
         )
 
 
+def _is_number(v: Any) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
 class StateStore:
     """One patch's active log + active ledger. Nobody else's (P4)."""
 
@@ -133,9 +246,30 @@ class StateStore:
             taken_at=time.monotonic() if taken_at is None else taken_at,
             note=note,
         )
+        self._derive_trend(r)
         self.readings.append(r)
         self._append_file(r.to_dict())
         return r
+
+    def _derive_trend(self, r: Reading) -> None:
+        """Give a numeric reading its vector, from the previous one.
+
+        The trend is the last-pair slope — (v - v_prev) / (t - t_prev)
+        against the most recent earlier numeric reading of the same
+        cell. Two readings at the same instant, or a non-numeric value
+        on either side, leave the reading trendless.
+        """
+        if not _is_number(r.value):
+            return
+        prev = self.latest_reading(r.cell)
+        if prev is None or not _is_number(prev.value):
+            return
+        spacing = r.taken_at - prev.taken_at
+        if spacing <= 0:
+            return
+        r.trend = (float(r.value) - float(prev.value)) / spacing
+        r.trend_from = (prev.taken_at, r.taken_at)
+        r.trend_spacing = spacing
 
     def latest_reading(self, cell: str) -> Reading | None:
         for r in reversed(self.readings):
@@ -205,8 +339,17 @@ class StateStore:
             if d.get("kind") == "ledger":
                 store.ledger.append(LedgerEntry.from_dict(d))
             elif d.get("kind") == "reading":
+                tf = d.get("trend_from")
                 store.readings.append(
-                    Reading(d["cell"], d["value"], d["taken_at"], d.get("note", ""))
+                    Reading(
+                        d["cell"],
+                        d["value"],
+                        d["taken_at"],
+                        d.get("note", ""),
+                        trend=d.get("trend"),
+                        trend_from=tuple(tf) if tf else None,
+                        trend_spacing=d.get("trend_spacing"),
+                    )
                 )
             elif d.get("kind") == "event":
                 store.events.append(d)

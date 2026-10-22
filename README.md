@@ -6,7 +6,7 @@ For builders of sovereign edge and fleet nodes — devices that must coordinate 
 
 ## Status
 
-**v0 built (2026-10-21).** The BUILD-BRIEF deliverables are implemented and acceptance-tested: `TransmissionEnvelope` + the Jev pair with the (band, yaw-time) deadband in `quilt_engine/`, one example `PatchManifest`, and the two-process file-drop demo in `examples/two_process_demo.py` (28 tests, `python3 -m unittest discover -s tests`, stdlib only). The scaffolding synthesizes two incompatible layouts proposed in the Gemini conversation rounds (see [ARCHITECTURE.md](ARCHITECTURE.md)) into one — that synthesis is a liaison decision, recorded here so a builder agent does not have to re-derive it.
+**v0 built (2026-10-21); v0.1 same day.** The BUILD-BRIEF deliverables are implemented and acceptance-tested: `TransmissionEnvelope` + the Jev pair with the (band, yaw-time) deadband in `quilt_engine/`, one example `PatchManifest`, and the two-process file-drop demo in `examples/two_process_demo.py` (42 tests, `python3 -m unittest discover -s tests`, stdlib only). v0.1 gives readings a vector: a numeric reading carries a `trend` derived from the previous reading of the same cell and can project itself a short, horizon-capped distance into the fog; the receiver may form its expected course from that projection, and every decision records the projection it used — or refused. The scaffolding synthesizes two incompatible layouts proposed in the Gemini conversation rounds (see [ARCHITECTURE.md](ARCHITECTURE.md)) into one — that synthesis is a liaison decision, recorded here so a builder agent does not have to re-derive it.
 
 ## Spec of record
 

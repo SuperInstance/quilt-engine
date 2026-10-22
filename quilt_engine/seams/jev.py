@@ -32,6 +32,16 @@ Sender/receiver divergence beyond a declared tolerance produces a
 
 v0 judges are small deterministic stand-ins (BUILD-BRIEF allows this);
 the comparative-pick tests exercise the real decision structure.
+
+v0.1: the receiver may form its expected course from *its own active
+log*. Given a ``log`` and a ``course_cell``, the expectation at
+decision time is its latest reading of that cell — projected along the
+reading's trend (vector) when the reading is stale, subject to the
+projection horizon cap. Every decision records the expectation it
+actually used and, when a projection was consulted, the ``Projection``
+itself — adopted or refused — so the seam log can show the fog
+behaviour instead of hiding it. Without a log, behaviour is exactly
+v0: the declared ``expected_course``.
 """
 
 from __future__ import annotations
@@ -41,6 +51,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from ..core.envelope import Ending, TransmissionEnvelope, canonical_json
+from ..core.state import PROJECTION_HORIZON_FACTOR, Projection, StateStore
 
 
 # ---------------------------------------------------------------- profiles
@@ -123,6 +134,10 @@ class Hold:
     pick_id: str | None
     deviation: float
     kind: str = "hold"
+    # v0.1 audit: the expectation the deviation was measured against,
+    # and the projection behind it when one was consulted (else None).
+    expected_course: float | None = None
+    projection: Projection | None = None
 
 
 @dataclass
@@ -131,6 +146,8 @@ class HoldWatch:
     deviation: float
     excursion_elapsed: float
     kind: str = "hold_watch"
+    expected_course: float | None = None
+    projection: Projection | None = None
 
 
 @dataclass
@@ -168,6 +185,8 @@ class Act:
     pick_id: str | None
     deviation: float
     kind: str = "act"
+    expected_course: float | None = None
+    projection: Projection | None = None
 
 
 Decision = Hold | HoldWatch | Act
@@ -202,6 +221,11 @@ class ReceiverJev:
     used only *after* the deadband triggers Act, to choose the
     response), ``pool_ttl`` (candidate readings go stale — P4),
     ``divergence_tolerance`` (§3.4).
+
+    v0.1: ``log`` + ``course_cell`` wire the expectation to the
+    receiver's own active log (see the module docstring);
+    ``projection_horizon_factor`` caps how far a reading's trend may
+    be projected, in multiples of the trend's spacing.
     """
 
     def __init__(
@@ -215,6 +239,9 @@ class ReceiverJev:
         pool_ttl: float = 30.0,
         divergence_tolerance: float = 0.25,
         measure_fn: Callable[[TransmissionEnvelope], Measurement] | None = None,
+        log: StateStore | None = None,
+        course_cell: str | None = None,
+        projection_horizon_factor: float = PROJECTION_HORIZON_FACTOR,
     ) -> None:
         self.deadband = deadband
         self.expected_course = expected_course
@@ -225,6 +252,9 @@ class ReceiverJev:
         self.pool_ttl = pool_ttl
         self.divergence_tolerance = divergence_tolerance
         self._measure_fn = measure_fn
+        self.log = log
+        self.course_cell = course_cell
+        self.projection_horizon_factor = projection_horizon_factor
         self._pool: dict[str, _PoolEntry] = {}
         self._excursion_start: float | None = None
         self._decided: set[str] = set()
@@ -321,6 +351,33 @@ class ReceiverJev:
             return ClarifyNarrow(question=question)
         return AcceptBest(envelope=pick.envelope)
 
+    # -- the expected course, possibly read out of the fog (v0.1) --------
+
+    def _expected_course_at(self, now: float) -> tuple[float, Projection | None]:
+        """The expectation the deadband should steer against at ``now``.
+
+        No log wired, no reading, or a trendless reading's raw value:
+        the fog-blind forms. A trended latest reading: its projection
+        to ``now`` — adopted (``Projection.used``) inside the horizon
+        cap; refused beyond it, in which case the raw (stale) value is
+        used and the refused projection still rides along so the seam
+        log shows the refusal.
+        """
+        if self.log is None or self.course_cell is None:
+            return self.expected_course, None
+        r = self.log.latest_reading(self.course_cell)
+        if r is None or not isinstance(r.value, (int, float)) or isinstance(
+            r.value, bool
+        ):
+            return self.expected_course, None
+        if r.trend is None:
+            return float(r.value), None
+        p = r.project(now, self.projection_horizon_factor)
+        if p.refused:
+            return float(r.value), p
+        p.used = True
+        return float(p.value), p
+
     # -- evaluation --------------------------------------------------------
 
     def evaluate(
@@ -345,20 +402,28 @@ class ReceiverJev:
             self._add(envelope, now)
         self._prune(now)
 
+        expected, projection = self._expected_course_at(now)
+
         if not self._pool:
             self._excursion_start = None
-            return Hold(pick_id=None, deviation=0.0)
+            return Hold(
+                pick_id=None, deviation=0.0,
+                expected_course=expected, projection=projection,
+            )
 
         # The comparative pick: best of the pool competing this round.
         pick = max(
             self._pool.values(),
             key=lambda e: (e.measurement.merit, -e.arrived_at),
         )
-        deviation = abs(pick.measurement.merit - self.expected_course)
+        deviation = abs(pick.measurement.merit - expected)
 
         if deviation <= self.deadband.band:
             self._excursion_start = None
-            return Hold(pick_id=pick.envelope.transmission_id, deviation=deviation)
+            return Hold(
+                pick_id=pick.envelope.transmission_id, deviation=deviation,
+                expected_course=expected, projection=projection,
+            )
 
         # Outside the band: the excursion timer governs (v1.1).
         if self._excursion_start is None:
@@ -367,6 +432,7 @@ class ReceiverJev:
                 pick_id=pick.envelope.transmission_id,
                 deviation=deviation,
                 excursion_elapsed=0.0,
+                expected_course=expected, projection=projection,
             )
         elapsed = now - self._excursion_start
         if elapsed < self.deadband.yaw_time:
@@ -374,6 +440,7 @@ class ReceiverJev:
                 pick_id=pick.envelope.transmission_id,
                 deviation=deviation,
                 excursion_elapsed=elapsed,
+                expected_course=expected, projection=projection,
             )
         response = self._policy(pick)
         self._pool = {}
@@ -387,6 +454,7 @@ class ReceiverJev:
             response=response,
             pick_id=pick.envelope.transmission_id,
             deviation=deviation,
+            expected_course=expected, projection=projection,
         )
 
     def _add(self, envelope: TransmissionEnvelope, now: float) -> None:

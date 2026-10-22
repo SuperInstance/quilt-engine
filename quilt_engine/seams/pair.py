@@ -134,8 +134,12 @@ class JevPair:
             )
         self.receiver.disagreements.clear()
 
-        # C2: every crossing readable after the fact.
+        # C2: every crossing readable after the fact. v0.1: the
+        # expectation the decision steered against, and the projection
+        # behind it when one was consulted — adopted or refused — so
+        # fog behaviour is auditable, never silent.
         pick_id = getattr(decision, "pick_id", None)
+        projection = getattr(decision, "projection", None)
         self._seam_log(
             {
                 "event": "crossing",
@@ -146,6 +150,8 @@ class JevPair:
                 "ending": envelope.ending.value,
                 "cost": envelope.cost_budget,
                 "decision": decision.kind,
+                "expected_course": getattr(decision, "expected_course", None),
+                "projection": projection.to_dict() if projection else None,
                 "contract": self.contract_id,
             }
         )
