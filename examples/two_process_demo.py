@@ -651,7 +651,7 @@ def verify(work: Path, scenario: str = "all") -> list[str]:
                 if fieldname not in c:
                     problems.append(f"crossing {c.get('transmission_id')} missing {fieldname}")
         if len(agreed_crossings(sender.ledger, receiver.ledger)[0]) < 6:
-            problems.append("only few agreed crossings (A-F + 2 responses = 8)")
+            problems.append("only few agreed crossings (A,B,D,E,F + 2 responses = 7)")
         sev = [e for e in read_jsonl(work / "sender_book.jsonl") if e.get("kind") == "event"]
         if not any(e.get("event") == "refusal_received" for e in sev):
             problems.append("sender never received the refusal profile")
@@ -671,6 +671,11 @@ def verify(work: Path, scenario: str = "all") -> list[str]:
     }
     if set(unagreed) != (disputed_ids & set(unagreed)):
         problems.append(f"unagreed crossings beyond the recorded disputes: {unagreed}")
+    # Main's corrected arithmetic (92d2527) is kept in the proposals
+    # verifier above, whose agreed-crossing check now reads
+    # "(A,B,D,E,F + 2 responses = 7)"; the tail len/sev checks from
+    # main are superseded here because v0.2 moved them into that
+    # verifier (payload-only runs must not require proposal crossings).
     return problems
 
 
