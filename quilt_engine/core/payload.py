@@ -196,8 +196,13 @@ def make_dispute(reading: OfferReading) -> TransmissionEnvelope:
 # ------------------------------------------------------------- bookings
 
 def book_offer_send(
-    book: StateStore, offer: TransmissionEnvelope, peer: str
+    book: StateStore, offer: TransmissionEnvelope, peer: str,
+    *, contract_id: str = "", contract_version: str | None = None,
 ) -> LedgerEntry:
+    # contract_id/contract_version carry the SEAM contract's citation
+    # (v0.3) — the version of the seam contract governing this crossing
+    # at booking time — distinct from ``contract``, the payload's own
+    # governing id (v0.2).
     return book.book(
         "SEND",
         transmission_id=offer.transmission_id,
@@ -208,11 +213,14 @@ def book_offer_send(
         cost=offer.cost_budget,
         contract=offer.contract or "",
         detail={"phase": "offer", "size": offer.payload_size},
+        contract_id=contract_id,
+        contract_version=contract_version,
     )
 
 
 def book_offer_receive(
-    book: StateStore, reading: OfferReading, peer: str
+    book: StateStore, reading: OfferReading, peer: str,
+    *, contract_id: str = "", contract_version: str | None = None,
 ) -> LedgerEntry:
     """Book the verified RECEIVE. The caller has checked ``reading.ok``."""
     if not reading.ok:
@@ -230,11 +238,14 @@ def book_offer_receive(
         cost=offer.cost_budget,
         contract=offer.contract or "",
         detail={"phase": "offer", "size": offer.payload_size},
+        contract_id=contract_id,
+        contract_version=contract_version,
     )
 
 
 def book_disputed_receive(
-    book: StateStore, reading: OfferReading, peer: str
+    book: StateStore, reading: OfferReading, peer: str,
+    *, contract_id: str = "", contract_version: str | None = None,
 ) -> LedgerEntry:
     """RECEIVE-DISPUTED, carrying the receiver's own computed hash."""
     offer = reading.envelope
@@ -254,11 +265,14 @@ def book_disputed_receive(
             "declared_size": reading.declared_size,
             "measured_size": reading.measured_size,
         },
+        contract_id=contract_id,
+        contract_version=contract_version,
     )
 
 
 def book_receipt_send(
-    book: StateStore, receipt: TransmissionEnvelope, reading: OfferReading, peer: str
+    book: StateStore, receipt: TransmissionEnvelope, reading: OfferReading, peer: str,
+    *, contract_id: str = "", contract_version: str | None = None,
 ) -> LedgerEntry:
     return book.book(
         "SEND",
@@ -273,11 +287,14 @@ def book_receipt_send(
             "in_reply_to": reading.envelope.transmission_id,
             "offer_hash": receipt.payload.get("payload_hash"),
         },
+        contract_id=contract_id,
+        contract_version=contract_version,
     )
 
 
 def book_receipt_receive(
-    book: StateStore, receipt: TransmissionEnvelope, peer: str
+    book: StateStore, receipt: TransmissionEnvelope, peer: str,
+    *, contract_id: str = "", contract_version: str | None = None,
 ) -> LedgerEntry:
     return book.book(
         "RECEIVE",
@@ -292,11 +309,14 @@ def book_receipt_receive(
             "in_reply_to": receipt.payload.get("about"),
             "offer_hash": receipt.payload.get("payload_hash"),
         },
+        contract_id=contract_id,
+        contract_version=contract_version,
     )
 
 
 def book_dispute_send(
-    book: StateStore, dispute: TransmissionEnvelope, reading: OfferReading, peer: str
+    book: StateStore, dispute: TransmissionEnvelope, reading: OfferReading, peer: str,
+    *, contract_id: str = "", contract_version: str | None = None,
 ) -> LedgerEntry:
     """The dispute crossing back — its payload embedded verbatim."""
     return book.book(
@@ -312,11 +332,14 @@ def book_dispute_send(
             "in_reply_to": reading.envelope.transmission_id,
             "dispute": dict(dispute.payload),
         },
+        contract_id=contract_id,
+        contract_version=contract_version,
     )
 
 
 def book_dispute_receive(
-    book: StateStore, dispute: TransmissionEnvelope, peer: str
+    book: StateStore, dispute: TransmissionEnvelope, peer: str,
+    *, contract_id: str = "", contract_version: str | None = None,
 ) -> LedgerEntry:
     """The sender's booking of the returned dispute — verbatim (§3.4)."""
     return book.book(
@@ -332,11 +355,14 @@ def book_dispute_receive(
             "in_reply_to": dispute.payload.get("about"),
             "dispute": dict(dispute.payload),
         },
+        contract_id=contract_id,
+        contract_version=contract_version,
     )
 
 
 def book_settle(
-    book: StateStore, offer: TransmissionEnvelope, peer: str
+    book: StateStore, offer: TransmissionEnvelope, peer: str,
+    *, contract_id: str = "", contract_version: str | None = None,
 ) -> LedgerEntry:
     """Phase 2. Refused unless this book itself holds match evidence.
 
@@ -388,6 +414,8 @@ def book_settle(
             "content": dict(offer.payload),
             "size": offer.payload_size,
         },
+        contract_id=contract_id,
+        contract_version=contract_version,
     )
 
 
@@ -405,6 +433,8 @@ def settled_payloads(ledger: Iterable[LedgerEntry]) -> dict[str, dict[str, Any]]
             out[e.transmission_id] = {
                 "payload_hash": e.payload_hash,
                 "contract": e.contract,
+                "contract_id": e.contract_id,
+                "contract_version": e.contract_version,
                 "size": e.detail.get("size"),
                 "content": decode_wire(e.detail.get("content", {})),
             }

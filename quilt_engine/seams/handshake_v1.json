@@ -1,0 +1,17 @@
+{
+  "contract": "beam-quilt/seam-handshake",
+  "describes": "the shape of the seam-handshake algorithm, not its calibrated parameters — band and yaw-time are the receiver's context, settable and learnable; they are readings, not the contract",
+  "steps": [
+    "the sender projects a typed profile of the payload (completeness, substance, confidence-by-aspect); it describes, it does not decide delivery",
+    "the envelope crosses the seam and nothing else crosses — no state references",
+    "the receiver re-measures the payload with its own questions and decides comparatively, against the pool of candidates competing for its attention this round",
+    "the deadband (band, yaw-time) is applied to how far acting on the pick would move the receiver from its predicted course",
+    "a divergence between sender profile and receiver measurement beyond the declared tolerance is recorded verbatim with both measurements, never averaged"
+  ],
+  "decision_types": ["hold", "hold_watch", "act"],
+  "act_responses": ["accept_best", "clarify_narrow", "escalate", "refuse"],
+  "ending_rule": "exactly one ending per transmission (MUTATE, MOVE, COPY, PROJECT); COPY is never a default and must be attributed",
+  "response_rule": "a response that travels back (refusal profile, clarify question) is itself booked as a crossing in the reverse direction",
+  "pool_rule": "the comparative pick is the best merit in the pool; a decided transmission id never re-enters the pool",
+  "agreement_rule": "a crossing counts as shared only where both books' bookings agree on transmission id, payload hash, and cited contract version"
+}

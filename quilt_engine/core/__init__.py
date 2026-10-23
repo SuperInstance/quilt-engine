@@ -1,9 +1,17 @@
 """core — TransmissionEnvelope, AlgorithmContract, StateStore.
 Implements beam-quilt SPEC §2 (Transmission) and §1 P4-P5 (sovereign state, own log).
 v0.2: core.payload — the payload-transfer agreement (gap 2, deepened).
+v0.3: core.versioning — contract versioning (gap 3, deepened): derived
+versions, revision-as-crossing, superseded-citation honouring, per-book
+folds (DESIGN-V03, ruling-neutral core).
 """
 
-from .contract import AlgorithmContract, ContractResult
+from .contract import (
+    AlgorithmContract,
+    ContractResult,
+    canonical_statement_bytes,
+    statement_version,
+)
 from .envelope import Ending, Provenance, TransmissionEnvelope
 from .payload import (
     DISPUTE_TYPE,
@@ -36,21 +44,75 @@ from .state import (
     LedgerEntry,
     Projection,
     Reading,
+    RevisionEntry,
     StateStore,
     agreed_crossings,
+)
+from .versioning import (
+    ADOPTION_ACK_TYPE,
+    REVISION_TYPE,
+    REVOCATION_TYPE,
+    CitationRuling,
+    adopt_revision,
+    book_seam_receive,
+    book_seam_send,
+    contract_state,
+    current_version,
+    held_statements,
+    make_adoption_ack,
+    make_revision_proposal,
+    make_revocation,
+    make_statement_request,
+    propose_revision,
+    receive_ack,
+    receive_proposal,
+    refuse_revision,
+    resolve_citation,
+    revoke_version,
+    seam_context,
+    send_proposal,
+    version_report,
+    withdraw_revision,
 )
 
 __all__ = [
     "AlgorithmContract",
     "ContractResult",
+    "canonical_statement_bytes",
+    "statement_version",
     "Ending",
     "Provenance",
     "TransmissionEnvelope",
     "LedgerEntry",
     "Projection",
     "Reading",
+    "RevisionEntry",
     "StateStore",
     "agreed_crossings",
+    "ADOPTION_ACK_TYPE",
+    "REVISION_TYPE",
+    "REVOCATION_TYPE",
+    "CitationRuling",
+    "adopt_revision",
+    "book_seam_receive",
+    "book_seam_send",
+    "contract_state",
+    "current_version",
+    "held_statements",
+    "make_adoption_ack",
+    "make_revision_proposal",
+    "make_revocation",
+    "make_statement_request",
+    "propose_revision",
+    "receive_ack",
+    "receive_proposal",
+    "refuse_revision",
+    "resolve_citation",
+    "revoke_version",
+    "seam_context",
+    "send_proposal",
+    "version_report",
+    "withdraw_revision",
     "PROJECTION_HORIZON_FACTOR",
     "DISPUTE_TYPE",
     "PAYLOAD_TYPE",

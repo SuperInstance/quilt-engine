@@ -113,7 +113,7 @@ class TestKillMidRun(unittest.TestCase):
             # crossings after the kill never reached the other side and
             # therefore are not agreed — shared state is agreement only.
             self.assertTrue(got < sent)
-            agreed, unagreed = agreed_crossings(sbook.ledger, rbook.ledger)
+            agreed, skewed, unagreed = agreed_crossings(sbook.ledger, rbook.ledger)
             self.assertEqual(set(unagreed), sent - got)
             self.assertTrue(agreed)
 

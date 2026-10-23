@@ -59,8 +59,9 @@ class TestBothSidesBooking(unittest.TestCase):
         # Gap 3: the governing contract's identity is in both entries.
         self.assertEqual(send.contract, "beam-quilt/seam-handshake@1.2")
         self.assertEqual(recv.contract, send.contract)
-        agreed, unagreed = agreed_crossings(sb.ledger, rb.ledger)
+        agreed, skewed, unagreed = agreed_crossings(sb.ledger, rb.ledger)
         self.assertEqual(agreed, [e.transmission_id])
+        self.assertEqual(skewed, [])
         self.assertEqual(unagreed, [])
 
     def test_receiver_active_log_has_dated_reading(self):
@@ -89,8 +90,9 @@ class TestBothSidesBooking(unittest.TestCase):
             cost=0.0,
             contract="beam-quilt/seam-handshake@1.2",
         )
-        agreed, unagreed = agreed_crossings(sb.ledger, rb.ledger)
+        agreed, skewed, unagreed = agreed_crossings(sb.ledger, rb.ledger)
         self.assertEqual(agreed, [])
+        self.assertEqual(skewed, [])
         self.assertEqual(unagreed, [e.transmission_id])
 
 

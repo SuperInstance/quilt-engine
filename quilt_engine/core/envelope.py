@@ -115,6 +115,13 @@ class TransmissionEnvelope:
     # and the identity of the contract governing the transfer.
     payload_size: int | None = None
     contract: str | None = None
+    # v0.3 seam-contract citation (DESIGN-V03 §6.1): the contract family
+    # and the version the sender applied — a content hash derived from
+    # the contract's canonical statement, never a display label. The
+    # version travels *in the envelope* rather than being looked up, so
+    # the two books agree on it by agreement, not by sharing a constant.
+    contract_id: str | None = None
+    contract_version: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.type, str) or not self.type:
@@ -142,7 +149,9 @@ class TransmissionEnvelope:
         """A re-send of the same transmission (same id, new span).
 
         Used when a sender re-asserts a candidate so the receiver's
-        dated reading of it does not go stale (P4: readings age).
+        dated reading of it does not go stale (P4: readings age). The
+        v0.3 citation carries along unchanged: a re-send is the same
+        crossing under the same version.
         """
         return TransmissionEnvelope(
             payload=self.payload,
@@ -155,6 +164,8 @@ class TransmissionEnvelope:
             copy_authorized_by=self.copy_authorized_by,
             payload_size=self.payload_size,
             contract=self.contract,
+            contract_id=self.contract_id,
+            contract_version=self.contract_version,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -173,6 +184,10 @@ class TransmissionEnvelope:
             d["payload_size"] = self.payload_size
         if self.contract is not None:
             d["contract"] = self.contract
+        if self.contract_id is not None:
+            d["contract_id"] = self.contract_id
+        if self.contract_version is not None:
+            d["contract_version"] = self.contract_version
         return d
 
     def to_json(self) -> str:
@@ -199,6 +214,8 @@ class TransmissionEnvelope:
             copy_authorized_by=d.get("copy_authorized_by"),
             payload_size=d.get("payload_size"),
             contract=d.get("contract"),
+            contract_id=d.get("contract_id"),
+            contract_version=d.get("contract_version"),
         )
         if (
             verify_payload_hash

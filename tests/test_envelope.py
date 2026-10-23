@@ -3,7 +3,11 @@
 import unittest
 
 from quilt_engine.core import Ending, TransmissionEnvelope
-from quilt_engine.core.contract import AlgorithmContract, ContractResult
+from quilt_engine.core.contract import (
+    AlgorithmContract,
+    ContractResult,
+    statement_version,
+)
 from quilt_engine.patches import PatchManifest
 
 
@@ -74,14 +78,17 @@ class TestContractShape(unittest.TestCase):
     def test_output_why_cost(self):
         contract = AlgorithmContract(
             name="echo",
-            version="1",
+            statement={"algorithm": "echo", "output": "input"},
             fn=lambda x: ContractResult(output=x, why="echo is honest", cost=0.1),
         )
-        self.assertEqual(contract.identity, "echo@1")
+        # v0.3 (§6.4): the version is derived from the statement, so the
+        # identity is name@sha256(statement) — a typed label is unrepresentable.
+        self.assertEqual(contract.version, statement_version(contract.statement))
+        self.assertEqual(contract.identity, f"echo@{contract.version}")
         self.assertEqual(contract.run(3).why, "echo is honest")
 
     def test_bare_score_is_non_conforming(self):
-        contract = AlgorithmContract(name="bad", version="1", fn=lambda x: 0.9)
+        contract = AlgorithmContract(name="bad", statement={"algorithm": "bare"}, fn=lambda x: 0.9)
         with self.assertRaises(TypeError):
             contract.run(3)
         with self.assertRaises(ValueError):

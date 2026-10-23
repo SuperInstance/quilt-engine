@@ -12,4 +12,10 @@ kill-mid-run and external-halt tests (these spawn real processes and
 take ~15 s in total). `test_projection.py` — v0.1: trend derivation,
 the horizon cap and its refusals, the fog scenarios (a stale reading
 corrected by its own wake, in both directions), and the seam-log
-audit of projections used and refused.
+audit of projections used and refused. `test_payload.py` — v0.2: the
+two-phase payload transfer (offer/settle), the dispute path, the
+settled/open/disputed folds. `test_versioning.py` — v0.3: derived
+contract versions, revision-as-crossing with adoption across sovereign
+timing, superseded/revoked/unknown citations, the skewed agreement
+category, and per-book folds that never re-fold history (see
+../DESIGN-V03-contract-versioning.md).

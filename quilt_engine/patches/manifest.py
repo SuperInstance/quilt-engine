@@ -21,7 +21,12 @@ class PatchManifest:
     emits: list[str]
     cost: str
     log_gc_rate: str
-    contract: str = ""
+    # v0.3 (DESIGN-V03 §6.5): the manifest declares which contract
+    # *version* the patch implements — a content hash, not a label. A
+    # patch implementing v2 whose manifest says v1 is a bug the
+    # manifest now makes visible.
+    contract_id: str = ""
+    contract_version: str = ""
 
     def __post_init__(self) -> None:
         if not self.name:
@@ -39,7 +44,8 @@ class PatchManifest:
             emits=list(d["emits"]),
             cost=d["cost"],
             log_gc_rate=d["log_gc_rate"],
-            contract=d.get("contract", ""),
+            contract_id=d.get("contract_id", ""),
+            contract_version=d.get("contract_version", ""),
         )
 
     @classmethod
@@ -53,5 +59,6 @@ class PatchManifest:
             "emits": self.emits,
             "cost": self.cost,
             "log_gc_rate": self.log_gc_rate,
-            "contract": self.contract,
+            "contract_id": self.contract_id,
+            "contract_version": self.contract_version,
         }

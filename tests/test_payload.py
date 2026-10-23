@@ -230,8 +230,9 @@ class TestDisputePath(unittest.TestCase):
 
     def test_tampered_crossing_is_not_agreed(self):
         sb, rb, offer, _ = self.tamper_full_path()
-        agreed, unagreed = agreed_crossings(sb.ledger, rb.ledger)
+        agreed, skewed, unagreed = agreed_crossings(sb.ledger, rb.ledger)
         self.assertEqual(agreed, [])
+        self.assertEqual(skewed, [])
         self.assertEqual(unagreed, [offer.transmission_id])
 
     def test_disputed_id_never_settles_even_after_clean_re_receive(self):
