@@ -255,6 +255,14 @@ class RevisionEntry:
     ``owner_consent`` is the §8.1 seam: whether a revision needs the
     owner's consent is an open ruling, so the field is recorded verbatim
     when supplied and enforced nowhere (DESIGN-V03 §8, open question 1).
+
+    v0.3.1 (CC1 F3): revisions belong to a *seam* — the pair
+    ``(contract_id, peer)`` — not to a book in the large. ``peer`` is
+    the counterparty of the seam the revision was proposed across; the
+    crossing path stamps it, the direct-write API leaves it ``None``
+    (unstamped records predate the field and count on every seam of
+    their family). The fold scopes by family, and by peer when the
+    records carry one.
     """
 
     kind: str = "revision"
@@ -269,6 +277,7 @@ class RevisionEntry:
     reason: str | None = None  # why refused / withdrawn / revoked
     related_crossing: str | None = None  # the proposal crossing's transmission id
     owner_consent: str | None = None  # §8.1 seam: recorded, never enforced
+    peer: str | None = None  # v0.3.1: the seam counterparty (F3); None = unstamped
     statement: dict | list | str | None = None  # the bytes the version hashes
 
     def __post_init__(self) -> None:
@@ -293,6 +302,7 @@ class RevisionEntry:
             "reason": self.reason,
             "related_crossing": self.related_crossing,
             "owner_consent": self.owner_consent,
+            "peer": self.peer,
             "statement": self.statement,
         }
 
@@ -311,6 +321,7 @@ class RevisionEntry:
             reason=d.get("reason"),
             related_crossing=d.get("related_crossing"),
             owner_consent=d.get("owner_consent"),
+            peer=d.get("peer"),
             statement=d.get("statement"),
         )
 

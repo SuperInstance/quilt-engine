@@ -224,10 +224,10 @@ def run_sender(work: Path, scenario: str = "all") -> int:
     def seam_now() -> str:
         # The version of the seam contract this book currently holds —
         # a fold of its own revision records, never a shared constant.
-        return current_version(book, BASE_STATEMENT)
+        return current_version(book, BASE_STATEMENT, contract_id=SEAM_FAMILY)
 
     def applied_now(env: TransmissionEnvelope) -> str | None:
-        state, held = seam_context(book, BASE_STATEMENT)
+        state, held = seam_context(book, BASE_STATEMENT, contract_id=SEAM_FAMILY)
         return resolve_citation(
             env.contract_version, state=state, held=held
         ).applied_version
@@ -252,7 +252,7 @@ def run_sender(work: Path, scenario: str = "all") -> int:
     ) -> None:
         """Book a response crossing arriving back, honouring the version
         it cites against this book's own fold (§2.5)."""
-        state, held = seam_context(book, BASE_STATEMENT)
+        state, held = seam_context(book, BASE_STATEMENT, contract_id=SEAM_FAMILY)
         ruling = resolve_citation(env.contract_version, state=state, held=held)
         book_seam_receive(book, env, RECEIVER, ruling=ruling, detail=detail)
 
@@ -576,7 +576,7 @@ def run_receiver(work: Path, until: float | None) -> int:
         version of the seam contract (§6.7)."""
         nonlocal resp_seq
         env.contract_id = SEAM_FAMILY
-        env.contract_version = current_version(book, BASE_STATEMENT)
+        env.contract_version = current_version(book, BASE_STATEMENT, contract_id=SEAM_FAMILY)
         book_seam_send(book, env, SENDER, detail={"in_reply_to": in_reply_to})
         resp_seq += 1
         (responses / f"{resp_seq:04d}-{env.transmission_id}.json").write_text(env.to_json())
@@ -614,7 +614,7 @@ def run_receiver(work: Path, until: float | None) -> int:
                 "event": "revision_position_booked",
                 "version": env.payload.get("version"),
                 "position": record.position,
-                "receiver_now_on": current_version(book, BASE_STATEMENT),
+                "receiver_now_on": current_version(book, BASE_STATEMENT, contract_id=SEAM_FAMILY),
             }
         )
 
@@ -630,7 +630,7 @@ def run_receiver(work: Path, until: float | None) -> int:
         version *this receiver applied* to the crossing."""
         reading = read_offer(text)
         env = reading.envelope
-        state, held = seam_context(book, BASE_STATEMENT)
+        state, held = seam_context(book, BASE_STATEMENT, contract_id=SEAM_FAMILY)
         ruling = resolve_citation(env.contract_version, state=state, held=held)
         if reading.ok:
             book_offer_receive(
@@ -730,7 +730,7 @@ def run_receiver(work: Path, until: float | None) -> int:
             # refusing revoked/unknown ones (§2.5, §3.1). Agreement on
             # the version is then a fact about two bookings, not a
             # shared constant.
-            state, held = seam_context(book, BASE_STATEMENT)
+            state, held = seam_context(book, BASE_STATEMENT, contract_id=SEAM_FAMILY)
             ruling = resolve_citation(env.contract_version, state=state, held=held)
             entry = book_seam_receive(book, env, SENDER, ruling=ruling)
             book.record_reading(
@@ -846,7 +846,7 @@ def run_receiver(work: Path, until: float | None) -> int:
             "role": RECEIVER,
             "received": sorted(first_seen),
             "unresolved_excursions": unresolved,
-            "seam_version_now": current_version(book, BASE_STATEMENT),
+            "seam_version_now": current_version(book, BASE_STATEMENT, contract_id=SEAM_FAMILY),
             "revisions": [
                 {
                     "version": r.version,
@@ -923,8 +923,8 @@ def verify_versioning(
     problems: list[str] = []
     # 1. Adoption required both books (§2.3): three bookings on each
     #    side, and both folds end on v2 with v1 superseded.
-    s_state = contract_state(sender.revisions, H1)
-    r_state = contract_state(receiver.revisions, H1)
+    s_state = contract_state(sender.revisions, H1, contract_id=SEAM_FAMILY)
+    r_state = contract_state(receiver.revisions, H1, contract_id=SEAM_FAMILY)
     if s_state["current"] != H2:
         problems.append(
             f"sender's fold is not on v2 (got {s_state['current'][:12]}…)"
@@ -1016,7 +1016,7 @@ def verify_versioning(
     for tid in v1_settled:
         if tid not in s_settled or s_settled[tid].get("contract_version") != H1:
             problems.append(f"the v1 settlement {tid} does not stand in both books")
-    rep = version_report(receiver.ledger, receiver.revisions, H1)
+    rep = version_report(receiver.ledger, receiver.revisions, H1, contract_id=SEAM_FAMILY)
     if rep["current"] != H2:
         problems.append("version_report does not show v2 in force now")
     if not set(v1_settled) <= set(rep["settlements_under_superseded"]):
